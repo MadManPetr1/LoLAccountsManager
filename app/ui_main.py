@@ -1,4 +1,3 @@
-# app/ui_main.py
 from PySide6.QtWidgets import (
     QMainWindow,
     QToolBar,
@@ -8,7 +7,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QDialogButtonBox
 )
-from PySide6.QtGui import QAction, QFont, QIcon
+from PySide6.QtGui import QAction, QFont, QIcon, QStandardItemModel, QStandardItem
 from PySide6.QtCore import Qt, QModelIndex
 
 import os
@@ -61,8 +60,18 @@ class MainWindow(QMainWindow):
         self.actions["Export JSON"].triggered.connect(self.export_json)
         self.actions["Sync Riot"].triggered.connect(self.sync_riot)
 
-        # ─── Tree View ───────────────────────────────────────────────────
+        # ─── Model & Tree View ───────────────────────────────────────────
+        self.model = QStandardItemModel(0, 9)
+        self.model.setHorizontalHeaderLabels([
+            "Region", "Type", "Login", "Password",
+            "Level", "Mail", "W/L", "Win rate", "Riot ID"
+        ])
+        # Use smaller font for headers
+        self.model.setHeaderData(0, Qt.Horizontal, QFont("Calibri", 8), Qt.FontRole)
+        self.model.dataChanged.connect(self.on_data_changed)
+
         self.tree = AccountTreeView(self)
+        self.tree.setModel(self.model)
         header = self.tree.header()
         header.setDefaultAlignment(Qt.AlignCenter)
         header.setSectionResizeMode(QHeaderView.ResizeToContents)
@@ -95,7 +104,96 @@ class MainWindow(QMainWindow):
         # Load data on startup
         self.load_data_async()
 
-    # ─── CRUD + Dialog Methods ────────────────────────────────────────
+    # ─── Data Population ─────────────────────────────────────────────
+    def on_data_changed(self, topLeft: QModelIndex, bottomRight: QModelIndex, roles):
+        for row in range(topLeft.row(), bottomRight.row() + 1):
+            for col in range(topLeft.column(), bottomRight.column() + 1):
+                index = self.model.index(row, col, topLeft.parent())
+                acc_id = index.data(Qt.UserRole)
+                if acc_id is None:
+                    continue
+
+                if col == 3:
+                    new_pw = index.data(Qt.UserRole + 1) or ""
+                    self.db.update_field(acc_id, "password", new_pw)
+                    self.model.setData(index, "***", Qt.DisplayRole)
+                elif col == 2:
+                    new_login = index.data(Qt.DisplayRole) or ""
+                    self.db.update_field(acc_id, "login", new_login)
+                elif col == 4:
+                    try:
+                        new_level = int(index.data(Qt.DisplayRole) or 0)
+                        self.db.update_field(acc_id, "level", new_level)
+                    except ValueError:
+                        pass
+                elif col == 5:
+                    new_mail = index.data(Qt.DisplayRole) or ""
+                    self.db.update_field(acc_id, "mail", new_mail)
+                elif col == 8:
+                    new_riot = index.data(Qt.DisplayRole) or ""
+                    self.db.update_field(acc_id, "riot_id", new_riot)
+
+    def on_accounts_loaded(self, accounts):
+        self.model.removeRows(0, self.model.rowCount())
+        tree_data = {}
+        for acc in accounts:
+            tree_data.setdefault(acc.region, {}).setdefault(acc.type, []).append(acc)
+
+        for region, types in tree_data.items():
+            region_items = [QStandardItem("") for _ in range(9)]
+            region_cell = QStandardItem(region)
+            region_cell.setFont(QFont("Calibri", 11, QFont.Bold))
+            region_items[0] = region_cell
+            for itm in region_items:
+                itm.setTextAlignment(Qt.AlignCenter)
+                itm.setFlags(Qt.ItemIsEnabled)
+            self.model.appendRow(region_items)
+            parent_region = self.model.item(self.model.rowCount() - 1, 0)
+
+            for ttype, accs in types.items():
+                type_items = [QStandardItem("") for _ in range(9)]
+                type_cell = QStandardItem(ttype)
+                type_items[1] = type_cell
+                for itm in type_items:
+                    itm.setTextAlignment(Qt.AlignCenter)
+                    itm.setFlags(Qt.ItemIsEnabled)
+                parent_region.appendRow(type_items)
+                parent_type = parent_region.child(parent_region.rowCount() - 1, 0)
+
+                for acc in accs:
+                    acc_items = [QStandardItem("") for _ in range(9)]
+                    values = {
+                        2: acc.login,
+                        4: str(acc.level),
+                        5: acc.mail,
+                        6: f"{acc.wins}/{acc.losses}",
+                        7: f"{acc.winrate}%",
+                        8: acc.riot_id
+                    }
+                    for col, val in values.items():
+                        item = QStandardItem(val)
+                        item.setData(acc.id, Qt.UserRole)
+                        flags = Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable
+                        if col in (6, 7):
+                            flags = Qt.ItemIsSelectable | Qt.ItemIsEnabled
+                        item.setFlags(flags)
+                        item.setTextAlignment(Qt.AlignCenter)
+                        acc_items[col] = item
+
+                    pwd_item = QStandardItem("***")
+                    pwd_item.setData(acc.password, Qt.UserRole + 1)
+                    pwd_item.setData(acc.id, Qt.UserRole)
+                    pwd_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable)
+                    pwd_item.setTextAlignment(Qt.AlignCenter)
+                    acc_items[3] = pwd_item
+
+                    parent_type.appendRow(acc_items)
+
+        self.tree.expandAll()
+        self.tree.header().resizeSections(QHeaderView.ResizeToContents)
+        self.statusBar().showMessage("Data loaded", 2000)
+
+    # ─── CRUD + Import/Export ───────────────────────────────────────
     def add_account(self):
         dlg = AccountDialog(self)
         if dlg.exec() == QDialogButtonBox.Accepted:
@@ -262,26 +360,4 @@ class MainWindow(QMainWindow):
         self.loader.accounts_loaded.connect(self.on_accounts_loaded)
         self.loader.start()
 
-    def on_accounts_loaded(self, accounts):
-        model = self.tree.model()
-        model.removeRows(0, model.rowCount())
-
-        # Build nested dictionary: { region: { type: [accounts...] } }
-        tree_data = {}
-        for acc in accounts:
-            tree_data.setdefault(acc.region, {}).setdefault(acc.type, []).append(acc)
-
-        for region, types in tree_data.items():
-            region_items = [None] * 9
-            region_cell = region_item = region_items[0] = region
-            # Create a bold region row
-            region_cells = [QIcon(), QIcon(), QIcon(), QIcon(), QIcon(), QIcon(), QIcon(), QIcon(), QIcon()]
-            region_cells[0] = region_item = model.invisibleRootItem().appendRow([region_item])
-            # Actually: use QStandardItemModel population logic if you use a QStandardItemModel.
-            # This snippet is a placeholder: you must reimplement column-by-column insertion
-            # following the example in the original main_window.py.
-            # For brevity, exact QStandardItemModel code is omitted here.
-
-        self.tree.expandAll()
-        self.tree.header().resizeSections(QHeaderView.ResizeToContents)
-        self.statusBar().showMessage("Data loaded", 2000)
+    # on_accounts_loaded already defined above
