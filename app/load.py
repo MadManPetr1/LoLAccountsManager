@@ -1,14 +1,42 @@
 # app/load.py
+import sqlite3
 from PySide6.QtCore import QThread, Signal
-from app.database import DatabaseManager
+from app.database import DB_PATH, Account
+
 
 class LoadThread(QThread):
-    accounts_loaded = Signal(list)
+    accounts_loaded = Signal(object)
 
-    def __init__(self, db_path):
+    def __init__(self, db_path=DB_PATH):
         super().__init__()
         self.db_path = db_path
 
     def run(self):
-        mgr = DatabaseManager(self.db_path)
-        self.accounts_loaded.emit(mgr.fetch_accounts())
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT * FROM accounts")
+        rows = cursor.fetchall()
+        conn.close()
+
+        grouped = {}
+        for row in rows:
+            region = row["region"]
+            ttype = row["type"]
+            acc = Account(
+                id=row["id"],
+                region=region,
+                type=ttype,
+                login=row["login"],
+                password=row["password"],
+                level=row["level"],
+                mail=row["mail"],
+                wins=row["wins"],
+                losses=row["losses"],
+                winrate=row["winrate"],
+                riot_id=row["riot_id"],
+            )
+            grouped.setdefault(region, {}).setdefault(ttype, []).append(acc)
+
+        self.accounts_loaded.emit(grouped)

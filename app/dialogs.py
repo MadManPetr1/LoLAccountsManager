@@ -1,4 +1,3 @@
-# app/dialogs.py
 import re
 from PySide6.QtWidgets import (
     QDialog,
@@ -23,50 +22,40 @@ class AccountDialog(QDialog):
 
         layout = QFormLayout(self)
 
-        # Region dropdown
         self.region_cb = QComboBox()
         self.region_cb.addItems(["EUNE", "EUW", "TR", "PBE"])
         layout.addRow("Region:", self.region_cb)
 
-        # Type dropdown
         self.type_cb = QComboBox()
         self.type_cb.addItems(["Mine", "Others"])
         layout.addRow("Type:", self.type_cb)
 
-        # Login field
         self.login_le = QLineEdit(self.account.login)
         layout.addRow("Login:", self.login_le)
 
-        # Password field
         self.pwd_le = QLineEdit(self.account.password)
         self.pwd_le.setEchoMode(QLineEdit.Password)
         layout.addRow("Password:", self.pwd_le)
 
-        # Mail field
         self.mail_le = QLineEdit(self.account.mail)
         layout.addRow("Mail:", self.mail_le)
 
-        # Riot ID field
         self.riot_le = QLineEdit(self.account.riot_id)
         layout.addRow("Riot ID:", self.riot_le)
 
-        # Error label
         self.error_lbl = QLabel("")
         self.error_lbl.setStyleSheet("color: red;")
         layout.addRow(self.error_lbl)
 
-        # OK / Cancel buttons
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.button(QDialogButtonBox.Ok).setEnabled(False)
         btns.accepted.connect(self.accept)
         btns.rejected.connect(self.reject)
         layout.addRow(btns)
 
-        # Link validators to enable/disable OK
         self.login_le.textChanged.connect(lambda: self.validate(btns))
         self.mail_le.textChanged.connect(lambda: self.validate(btns))
 
-        # Pre‐select existing data if editing
         if account:
             self.region_cb.setCurrentText(account.region)
             self.type_cb.setCurrentText(account.type)
@@ -121,18 +110,14 @@ class BulkImportPreviewDialog(QDialog):
 
         table = QTableWidget(len(rows), len(rows[0]) if rows else 0)
         table.setHorizontalHeaderLabels(list(rows[0].keys()) if rows else [])
-        # CORRECTED: Use QHeaderView.ResizeToContents directly
         table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         table.verticalHeader().setVisible(False)
 
-        # Fill in the table widget
         for i, row in enumerate(rows):
             for j, (key, val) in enumerate(row.items()):
                 item = QTableWidgetItem(val if val is not None else "")
-                # Highlight missing login
                 if key == "login" and not val.strip():
                     item.setBackground(Qt.red)
-                # Highlight invalid winrate (if non‐numeric)
                 if key == "winrate" and val.strip():
                     try:
                         float(val)
