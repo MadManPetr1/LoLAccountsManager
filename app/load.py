@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# app/load.py
 from PySide6.QtCore import QThread, Signal
 from app.database import DatabaseManager
 

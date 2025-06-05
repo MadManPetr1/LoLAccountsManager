@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# app/database.py
 import os
 import sqlite3
 import base64

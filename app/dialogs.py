@@ -1,9 +1,16 @@
-# -*- coding: utf-8 -*-
+# app/dialogs.py
 import re
 from PySide6.QtWidgets import (
-    QDialog, QFormLayout, QLineEdit, QComboBox, QSpinBox,
-    QDialogButtonBox, QLabel, QVBoxLayout, QTableWidget,
-    QTableWidgetItem, QPushButton, QHeaderView
+    QDialog,
+    QFormLayout,
+    QLineEdit,
+    QComboBox,
+    QSpinBox,
+    QDialogButtonBox,
+    QLabel,
+    QVBoxLayout,
+    QTableWidget,
+    QTableWidgetItem
 )
 from PySide6.QtCore import Qt
 from app.database import Account
@@ -85,7 +92,6 @@ class AccountDialog(QDialog):
         buttons.button(QDialogButtonBox.Ok).setEnabled(True)
 
     def get_account(self) -> Account:
-        # Called only if validated
         wins = self.wins_sb.value()
         losses = self.losses_sb.value()
         winrate = wins / (wins + losses) * 100 if (wins + losses) else 0
@@ -105,9 +111,6 @@ class AccountDialog(QDialog):
 
 class BulkImportPreviewDialog(QDialog):
     def __init__(self, rows: list, parent=None):
-        """
-        rows: list of dicts (CSV rows), probably first 10 rows.
-        """
         super().__init__(parent)
         self.setWindowTitle("CSV Preview (first 10 rows)")
         self.rows = rows
@@ -116,7 +119,7 @@ class BulkImportPreviewDialog(QDialog):
 
         table = QTableWidget(len(rows), len(rows[0]) if rows else 0)
         table.setHorizontalHeaderLabels(list(rows[0].keys()) if rows else [])
-        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(QTableWidget.horizontalHeader(), Qt.ResizeToContents)
         table.verticalHeader().setVisible(False)
 
         for i, row in enumerate(rows):
