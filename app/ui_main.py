@@ -9,7 +9,9 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QToolButton,
-    QMenu
+    QMenu,
+    QWidget,
+    QSizePolicy
 )
 from PySide6.QtGui import QAction, QIcon, QStandardItemModel, QStandardItem
 from PySide6.QtCore import Qt
@@ -31,6 +33,8 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "accounts.db")
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        # Use DataShieldP.ico as the app/window icon
+        self.setWindowIcon(QIcon("assets/icons/ico/DataShieldP.ico"))
         self.db = DatabaseManager(DB_PATH)
         self.ranked_info = {}
         self._init_ui()
@@ -41,52 +45,69 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(800, 600)
 
         toolbar = QToolBar("Main Toolbar", self)
+        toolbar.setMovable(False)
         self.addToolBar(toolbar)
 
-        # Add Account button
+        # -- ADD ACCOUNT (primary, text-heavy button) --
         add_btn = QToolButton()
+        add_btn.setText("➕ Add Account")
         add_btn.setIcon(QIcon("assets/icons/ico/ProfileP.ico"))
-        add_btn.setToolTip("Add Account")
+        add_btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         add_btn.setAutoRaise(True)
         add_btn.clicked.connect(self.add_account)
         toolbar.addWidget(add_btn)
 
-        # Sync Riot button
-        sync_btn = QToolButton()
-        sync_btn.setIcon(QIcon("assets/icons/ico/DataShieldP.ico"))
-        sync_btn.setToolTip("Sync Riot")
-        sync_btn.setAutoRaise(True)
-        sync_btn.clicked.connect(self.sync_riot)
-        toolbar.addWidget(sync_btn)
-        self.actions = {"Sync Riot": sync_btn}
+        # Separator
+        toolbar.addSeparator()
 
+        # -- IMPORT / EXPORT GROUPED TOOLS --
         # Import dropdown
         import_btn = QToolButton()
-        import_btn.setText("Import")
+        import_btn.setText("Import ▼")
         import_btn.setPopupMode(QToolButton.MenuButtonPopup)
         import_menu = QMenu(import_btn)
         import_menu.addAction("Import CSV", self.import_csv)
         import_menu.addAction("Import JSON", self.import_json)
         import_btn.setMenu(import_menu)
+        import_btn.setAutoRaise(True)
         toolbar.addWidget(import_btn)
 
         # Export dropdown
         export_btn = QToolButton()
-        export_btn.setText("Export")
+        export_btn.setText("Export ▼")
         export_btn.setPopupMode(QToolButton.MenuButtonPopup)
         export_menu = QMenu(export_btn)
         export_menu.addAction("Export CSV", self.export_csv)
         export_menu.addAction("Export JSON", self.export_json)
         export_btn.setMenu(export_menu)
+        export_btn.setAutoRaise(True)
         toolbar.addWidget(export_btn)
 
-        # Delete Database button
-        delete_btn = QToolButton()
-        delete_btn.setText("Reset DB")
-        delete_btn.setToolTip("Delete entire database")
-        delete_btn.setAutoRaise(True)
-        delete_btn.clicked.connect(self.delete_database)
-        toolbar.addWidget(delete_btn)
+        # Separator
+        toolbar.addSeparator()
+
+        # -- SYNC RIOT (secondary) --
+        sync_btn = QToolButton()
+        sync_btn.setText("🔄 Sync Riot")
+        sync_btn.setIcon(QIcon("assets/icons/ico/DataShieldP.ico"))
+        sync_btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        sync_btn.setAutoRaise(True)
+        sync_btn.clicked.connect(self.sync_riot)
+        toolbar.addWidget(sync_btn)
+        self.actions = {"Sync Riot": sync_btn}
+
+        # Spacer to push Reset DB to far right
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        toolbar.addWidget(spacer)
+
+        # -- RESET DATABASE (tertiary) --
+        reset_btn = QToolButton()
+        reset_btn.setText("⚠️ Reset DB")
+        reset_btn.setToolTip("Delete entire database")
+        reset_btn.setAutoRaise(True)
+        reset_btn.clicked.connect(self.delete_database)
+        toolbar.addWidget(reset_btn)
 
         # Tree View (with password delegate on column 1)
         self.tree = AccountTreeView(self)
