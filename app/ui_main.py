@@ -1,4 +1,5 @@
 # app/ui_main.py
+
 from PySide6.QtWidgets import (
     QMainWindow,
     QToolBar,
@@ -6,7 +7,9 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QMessageBox,
     QDialog,
-    QDialogButtonBox
+    QDialogButtonBox,
+    QToolButton,
+    QMenu
 )
 from PySide6.QtGui import QAction, QIcon, QStandardItemModel, QStandardItem
 from PySide6.QtCore import Qt
@@ -40,34 +43,50 @@ class MainWindow(QMainWindow):
         toolbar = QToolBar("Main Toolbar", self)
         self.addToolBar(toolbar)
 
-        add_action = QAction(QIcon("assets/icons/ico/ProfileP.ico"), "Add Account", self)
-        add_action.triggered.connect(self.add_account)
-        toolbar.addAction(add_action)
+        # Add Account button
+        add_btn = QToolButton()
+        add_btn.setIcon(QIcon("assets/icons/ico/ProfileP.ico"))
+        add_btn.setToolTip("Add Account")
+        add_btn.setAutoRaise(True)
+        add_btn.clicked.connect(self.add_account)
+        toolbar.addWidget(add_btn)
 
-        sync_action = QAction(QIcon("assets/icons/ico/DataShieldP.ico"), "Sync Riot", self)
-        sync_action.triggered.connect(self.sync_riot)
-        toolbar.addAction(sync_action)
-        self.actions = {"Sync Riot": sync_action}
+        # Sync Riot button
+        sync_btn = QToolButton()
+        sync_btn.setIcon(QIcon("assets/icons/ico/DataShieldP.ico"))
+        sync_btn.setToolTip("Sync Riot")
+        sync_btn.setAutoRaise(True)
+        sync_btn.clicked.connect(self.sync_riot)
+        toolbar.addWidget(sync_btn)
+        self.actions = {"Sync Riot": sync_btn}
 
-        import_csv = QAction("Import CSV", self)
-        import_csv.triggered.connect(self.import_csv)
-        toolbar.addAction(import_csv)
+        # Import dropdown
+        import_btn = QToolButton()
+        import_btn.setText("Import")
+        import_btn.setPopupMode(QToolButton.MenuButtonPopup)
+        import_menu = QMenu(import_btn)
+        import_menu.addAction("Import CSV", self.import_csv)
+        import_menu.addAction("Import JSON", self.import_json)
+        import_btn.setMenu(import_menu)
+        toolbar.addWidget(import_btn)
 
-        export_csv = QAction("Export CSV", self)
-        export_csv.triggered.connect(self.export_csv)
-        toolbar.addAction(export_csv)
+        # Export dropdown
+        export_btn = QToolButton()
+        export_btn.setText("Export")
+        export_btn.setPopupMode(QToolButton.MenuButtonPopup)
+        export_menu = QMenu(export_btn)
+        export_menu.addAction("Export CSV", self.export_csv)
+        export_menu.addAction("Export JSON", self.export_json)
+        export_btn.setMenu(export_menu)
+        toolbar.addWidget(export_btn)
 
-        import_json = QAction("Import JSON", self)
-        import_json.triggered.connect(self.import_json)
-        toolbar.addAction(import_json)
-
-        export_json = QAction("Export JSON", self)
-        export_json.triggered.connect(self.export_json)
-        toolbar.addAction(export_json)
-
-        delete_db = QAction("Delete Database", self)
-        delete_db.triggered.connect(self.delete_database)
-        toolbar.addAction(delete_db)
+        # Delete Database button
+        delete_btn = QToolButton()
+        delete_btn.setText("Reset DB")
+        delete_btn.setToolTip("Delete entire database")
+        delete_btn.setAutoRaise(True)
+        delete_btn.clicked.connect(self.delete_database)
+        toolbar.addWidget(delete_btn)
 
         # Tree View (with password delegate on column 1)
         self.tree = AccountTreeView(self)
@@ -165,7 +184,8 @@ class MainWindow(QMainWindow):
             with open(path, "w", newline="", encoding="utf-8-sig") as f:
                 writer = csv.writer(f)
                 writer.writerow([
-                    "Login", "Password", "Level", "Email", "Ranked", "Wins/Losses", "Winrate", "Riot ID"
+                    "Login", "Password", "Level", "Email", "Ranked",
+                    "Wins/Losses", "Winrate", "Riot ID"
                 ])
                 for region, types in accounts.items():
                     for ttype, accs in types.items():
@@ -247,7 +267,8 @@ class MainWindow(QMainWindow):
     def on_accounts_loaded(self, accounts):
         model = QStandardItemModel()
         model.setHorizontalHeaderLabels([
-            "Login", "Password", "Level", "Email", "Ranked", "Wins/Losses", "Winrate", "Riot ID"
+            "Login", "Password", "Level", "Email", "Ranked",
+            "Wins/Losses", "Winrate", "Riot ID"
         ])
         model.itemChanged.connect(self.on_item_changed)
 
@@ -327,7 +348,11 @@ class MainWindow(QMainWindow):
 
         self.tree.setModel(model)
         self.tree.expandAll()
+
+        # Center-align header titles
+        self.tree.header().setDefaultAlignment(Qt.AlignCenter)
         self.tree.header().resizeSections(QHeaderView.ResizeToContents)
+
         self.statusBar().showMessage("Data loaded", 2000)
 
     def on_item_changed(self, item):
@@ -335,10 +360,9 @@ class MainWindow(QMainWindow):
         col = item.column()
         text = item.text()
 
-        # Map columns to database fields
         if col == 0:  # Login
             self.db.update_field(acc_id, "login", text)
-        elif col == 1:  # Password (actual stored in UserRole+1)
+        elif col == 1:  # Password (stored via UserRole+1)
             new_pwd = item.data(Qt.UserRole + 1)
             self.db.update_field(acc_id, "password", new_pwd)
         elif col == 2:  # Level
@@ -360,7 +384,6 @@ class MainWindow(QMainWindow):
                 self.db.update_field(acc_id, "losses", losses)
                 wr = round(wins / (wins + losses) * 100, 1) if (wins + losses) else 0.0
                 self.db.update_field(acc_id, "winrate", wr)
-                # Update the Winrate cell in the same row
                 parent_item = item.parent()
                 if parent_item:
                     wr_item = parent_item.child(item.row(), 6)
