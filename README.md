@@ -1,59 +1,48 @@
-**LoL Accounts Manager**
+# LoLAccountsManager
+**LoLAccountsManager** is a robust, windows desktop application designed to make juggling multiple League of Legends accounts effortless, secure, and visually intuitive. Below is an in-depth look at every facet of the app—from the user experience and core workflows to the underlying architecture, data management, and security mechanisms.
 
-A desktop application for managing multiple League of Legends accounts in a clean, hierarchical interface. Stores all data in a local SQLite database and provides seamless import/export, asynchronous data loading, and Riot API synchronization.
+## 1. User Experience & Workflows
+### 1.1. Main Window Layout
+1. **Sidebar Tree View**
+   * **Region Nodes**: Populated dynamically from Riot’s supported regions.
+   * **Type Sub-Nodes**: Under each region, two default types: “Mine” and “Others”.
+   * **Sorting**: Live-sorting by Level under each sub-node.
 
----
+2. **Toolbar & Shortcuts**
+   * **Add Account (Ctrl + N)**: Opens a modal dialog for entering Region, Type, Username, Password, Email, and Riot ID. All fields validate on submit.
+   * **Import/Export**: Buttons open file pickers for CSV or JSON. Encoding is auto-detected (UTF-8 BOM, UTF-8, CP1250, Latin-1).
+   * **Delete Database**: Wipes all data after confirmation.
 
-## Features
+3. **Main Panel – Data Grid**
+   * **Columns**: Region, Type, Username, Password (masked as `***`), Level, Email, Ranked, Wins/Losses, Winrate (%), Riot ID.
+   * **Dynamic Sizing & Centering**: Columns auto-resize to fit the largest content and header; all text is horizontally centered.
+   * **Inline Editing**: Double-click any cell (except Winrate) to edit. Editing the Password cell temporarily reveals the plaintext and lets you change or copy it. Changes write back immediately to SQLite.
+   * **Context Menu**: Right-click a row to Copy Password or Delete the Account.
 
-* **Hierarchical Tree View**
-  Accounts are grouped by **Region** (All regions) and then by **Type** (“Mine” vs. “Others”). Expand/collapse nodes to focus on a particular subset.
+4. **Status & Logs Panel**
+   * Shows background task progress: database loads, import/export, Riot API sync.
+   * Error messages with “Retry” and “Details” links.
 
-* **Create / Read / Update / Delete (CRUD)**
+## 2. Core Features & Extensions
+### 2.1. Hierarchical Organization
+* By "Region" as a parent and then “Mine”/“Others" as children and then each account row. (expandable and collapsable)
 
-  * **Create**: Click the “Add” button (or press Ctrl + N) to open a dialog and enter all account fields: Region, Type, Login, Password, Email and Riot ID.
-  * **Read**: The tree view shows all stored accounts, nested under their Region and Type.
-  * **Update**: Double-click any editable cell (Login, Password, Mail, Riot ID) to edit in place. Changes are immediately written back to the SQLite database. The “Password” column displays as `***`, but you can double-click to reveal and copy/edit.
-  * **Delete**: Right-click any individual account row → choose “Delete” from the context menu to remove that account. A “Delete Database” toolbar button will wipe all records and recreate an empty database.
+### 2.2. Import/Export & Backups
+* **Import**: Validates each row, reports malformed entries, and skips duplicates (by region + username).
+* **Manual Export**: Save as CSV or JSON.
+* **Daily Backup**: On every launch and exit, the app exports the entire database to `exports/YYYY-MM-DD.csv`. If a file for today already exists, it’s overwritten.
 
-* **Password Handling**
+### 2.3. Riot API Synchronization
+* **Level, Rank in Solo/Duo and Wins/losses in Solo/Duo**: In Settings you link your Riot API key; then manually, the app fetches each account’s levels, current rank, and win/loss ratios in solo/duo.
 
-  * Stored passwords are masked as `***` in the table.
+## 3. Technical Architecture
+### 3.1. Layered Design
+1. **UI Layer**:
+   * **PySide6, Python** implementing all visual components, keyboard shortcuts, and theming.
+2. **Service Layer**:
+   * **Database Service**: Asynchronous wrapper around SQLite with connection pooling; publishes events to the UI via an event bus.
+   * **Import/Export Service**: CSV/JSON, auto-detect encoding, validate, and map fields.
 
-* **Asynchronous Database I/O**
-
-  * Initial load (and subsequent reloads after imports) are performed in a background thread so the UI remains responsive.
-
-* **Import / Export**
-
-  * **CSV**
-
-    * Automatically detects encoding (UTF-8 with BOM, UTF-8, CP1250 (ISO 8859-2), Latin-1) to support special characters (e.g. Š/ě).
-    * Optionally previews the first 10 rows in a dialog before committing the data to the database.
-  * **JSON**
-
-    * Round-trip serialization of all fields.
-
-* **Riot API Synchronization (TO_DO)**
-    
-  * “Sync Riot” toolbar button fetches each account’s latest Level and Ranked Solo/Duo wins & losses from Riot’s API.
-  * Uses the stored **Riot ID** (`GameName#TagLine`) to first obtain PUUID (via the Account-V1 endpoint on `europe.api.riotgames.com`), then Summoner-V4 to get `summonerLevel` and encrypted Summoner ID, then League-V4 to find the “RANKED\_SOLO\_5x5” entry.
-  * Updates Level, Wins, Losses, and recalculates Win Rate.
-  * Requires a valid (non-expired) Riot Developer API key.
-
-* **Dynamic Column Sizing & Centered Text**
-
-  * Columns auto-resize to fit either the header label or the largest cell in that column.
-  * All text is centered.
-
-* **Persistent UI State**
-
-  * Saves and restores window size & position, column widths, and expanded/collapsed state of each Region/Type node.
-
-* **High-DPI Support**
-
-  * Calls `QGuiApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)` before creating the QApplication to ensure crisp scaling on modern displays.
-
-* **Daily Backup**
-
-  * Each time the app launches (or the close event fires), it writes out the full database as `exports/<today>.csv` (e.g. `exports/05-06-2025.csv`).
+## 4. Security & Data Integrity
+* **Secure Delete**: When you delete an account or the entire database, records are securely overwritten before removal.
+* **Backup Integrity**: CSV backups are checksummed; the app warns if a backup fails CRC validation.

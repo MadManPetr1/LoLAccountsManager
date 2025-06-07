@@ -3,7 +3,6 @@ import sqlite3
 import requests
 from PySide6.QtCore import QThread, Signal
 
-
 class RiotUpdateThread(QThread):
     finished = Signal(list)
 

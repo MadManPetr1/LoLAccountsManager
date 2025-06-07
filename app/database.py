@@ -3,24 +3,22 @@ import sqlite3
 import os
 from dataclasses import dataclass
 
-
 DB_PATH = os.path.join(os.path.dirname(__file__), "accounts.db")
-
 
 @dataclass
 class Account:
     id: int = None
     region: str = ""
     type: str = ""
-    login: str = ""
+    username: str = ""
     password: str = ""
     level: int = 0
     mail: str = ""
+    ranked: str = ""
     wins: int = 0
     losses: int = 0
     winrate: float = 0.0
     riot_id: str = ""
-
 
 class DatabaseManager:
     def __init__(self, db_path=DB_PATH):
@@ -40,10 +38,11 @@ class DatabaseManager:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 region TEXT,
                 type TEXT,
-                login TEXT,
+                username TEXT,
                 password TEXT,
                 level INTEGER,
                 mail TEXT,
+                ranked TEXT,
                 wins INTEGER,
                 losses INTEGER,
                 winrate REAL,
@@ -56,16 +55,17 @@ class DatabaseManager:
     def add_account(self, account: Account):
         self.cursor.execute(
             """
-            INSERT INTO accounts (region, type, login, password, level, mail, wins, losses, winrate, riot_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO accounts (region, type, username, password, level, mail, ranked, wins, losses, winrate, riot_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 account.region,
                 account.type,
-                account.login,
+                account.username,
                 account.password,
                 account.level,
                 account.mail,
+                account.ranked,
                 account.wins,
                 account.losses,
                 account.winrate,
@@ -85,10 +85,11 @@ class DatabaseManager:
                 id=row["id"],
                 region=region,
                 type=ttype,
-                login=row["login"],
+                username=row["username"],
                 password=row["password"],
                 level=row["level"],
                 mail=row["mail"],
+                ranked=row["ranked"],
                 wins=row["wins"],
                 losses=row["losses"],
                 winrate=row["winrate"],

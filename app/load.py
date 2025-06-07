@@ -3,7 +3,6 @@ import sqlite3
 from PySide6.QtCore import QThread, Signal
 from app.database import DB_PATH, Account
 
-
 class LoadThread(QThread):
     accounts_loaded = Signal(object)
 
@@ -28,10 +27,11 @@ class LoadThread(QThread):
                 id=row["id"],
                 region=region,
                 type=ttype,
-                login=row["login"],
+                username=row["username"],
                 password=row["password"],
                 level=row["level"],
                 mail=row["mail"],
+                ranked=row["ranked"],
                 wins=row["wins"],
                 losses=row["losses"],
                 winrate=row["winrate"],

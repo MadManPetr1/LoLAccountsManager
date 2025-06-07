@@ -30,8 +30,8 @@ class AccountDialog(QDialog):
         self.type_cb.addItems(["Mine", "Others"])
         layout.addRow("Type:", self.type_cb)
 
-        self.login_le = QLineEdit(self.account.login)
-        layout.addRow("Login:", self.login_le)
+        self.username_le = QLineEdit(self.account.username)
+        layout.addRow("Username:", self.username_le)
 
         self.pwd_le = QLineEdit(self.account.password)
         self.pwd_le.setEchoMode(QLineEdit.Password)
@@ -53,7 +53,7 @@ class AccountDialog(QDialog):
         btns.rejected.connect(self.reject)
         layout.addRow(btns)
 
-        self.login_le.textChanged.connect(lambda: self.validate(btns))
+        self.username_le.textChanged.connect(lambda: self.validate(btns))
         self.mail_le.textChanged.connect(lambda: self.validate(btns))
 
         if account:
@@ -61,13 +61,10 @@ class AccountDialog(QDialog):
             self.type_cb.setCurrentText(account.type)
 
     def validate(self, buttons):
-        """
-        Only enable OK if login is non‐empty and mail is a valid email.
-        """
-        login = self.login_le.text().strip()
+        username = self.username_le.text().strip()
         mail = self.mail_le.text().strip()
-        if not login:
-            self.error_lbl.setText("Login cannot be empty.")
+        if not username:
+            self.error_lbl.setText("Username cannot be empty.")
             buttons.button(QDialogButtonBox.Ok).setEnabled(False)
             return
         if not re.match(r"[^@]+@[^@]+\.[^@]+", mail):
@@ -78,24 +75,20 @@ class AccountDialog(QDialog):
         buttons.button(QDialogButtonBox.Ok).setEnabled(True)
 
     def get_account(self) -> Account:
-        """
-        Return an Account instance.
-        Level, wins, losses, winrate will all be initialized to 0.
-        """
         return Account(
             id=self.account.id,
             region=self.region_cb.currentText(),
             type=self.type_cb.currentText(),
-            login=self.login_le.text().strip(),
+            username=self.username_le.text().strip(),
             password=self.pwd_le.text(),
-            level=0,                 # set to 0 initially
+            level=0,
             mail=self.mail_le.text().strip(),
-            wins=0,                  # set to 0 initially
-            losses=0,                # set to 0 initially
-            winrate=0.0,             # set to 0 initially
+            ranked="",  # Not asked on creation
+            wins=0,
+            losses=0,
+            winrate=0.0,
             riot_id=self.riot_le.text().strip()
         )
-
 
 class BulkImportPreviewDialog(QDialog):
     def __init__(self, rows: list, parent=None):
@@ -116,7 +109,7 @@ class BulkImportPreviewDialog(QDialog):
         for i, row in enumerate(rows):
             for j, (key, val) in enumerate(row.items()):
                 item = QTableWidgetItem(val if val is not None else "")
-                if key == "login" and not val.strip():
+                if key == "username" and not val.strip():
                     item.setBackground(Qt.red)
                 if key == "winrate" and val.strip():
                     try:

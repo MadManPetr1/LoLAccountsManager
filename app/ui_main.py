@@ -1,27 +1,15 @@
 # app/ui_main.py
 
 from PySide6.QtWidgets import (
-    QMainWindow,
-    QToolBar,
-    QHeaderView,
-    QFileDialog,
-    QMessageBox,
-    QDialog,
-    QDialogButtonBox,
-    QToolButton,
-    QMenu,
-    QWidget,
-    QSizePolicy
+    QMainWindow, QToolBar, QHeaderView, QFileDialog, QMessageBox, QDialog,
+    QDialogButtonBox, QToolButton, QMenu, QWidget, QSizePolicy
 )
-from PySide6.QtGui import QAction, QIcon, QStandardItemModel, QStandardItem
+from PySide6.QtGui import QIcon, QStandardItemModel, QStandardItem
 from PySide6.QtCore import Qt
-
-import os
-import csv
-import json
+import os, csv, json
 from datetime import datetime
 
-from app.account_model import AccountTreeView, PasswordDelegate
+from app.account_model import AccountTreeView, PasswordDelegate, RankOnlyIconDelegate
 from app.database import DatabaseManager, DB_PATH, Account
 from app.dialogs import AccountDialog, BulkImportPreviewDialog
 from app.load import LoadThread
@@ -29,11 +17,9 @@ from app.riot_api import RiotUpdateThread
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "accounts.db")
 
-
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        # Use DataShieldP.ico as the app/window icon
         self.setWindowIcon(QIcon("assets/icons/ico/DataShieldP.ico"))
         self.db = DatabaseManager(DB_PATH)
         self.ranked_info = {}
@@ -43,27 +29,21 @@ class MainWindow(QMainWindow):
     def _init_ui(self):
         self.setWindowTitle("LoL Accounts Manager")
         self.setMinimumSize(800, 600)
-
         toolbar = QToolBar("Main Toolbar", self)
         toolbar.setMovable(False)
         self.addToolBar(toolbar)
 
-        # -- ADD ACCOUNT (primary, text-heavy button) --
         add_btn = QToolButton()
-        add_btn.setText("➕ Add Account")
+        add_btn.setText("Add Account")
         add_btn.setIcon(QIcon("assets/icons/ico/ProfileP.ico"))
         add_btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         add_btn.setAutoRaise(True)
         add_btn.clicked.connect(self.add_account)
         toolbar.addWidget(add_btn)
-
-        # Separator
         toolbar.addSeparator()
 
-        # -- IMPORT / EXPORT GROUPED TOOLS --
-        # Import dropdown
         import_btn = QToolButton()
-        import_btn.setText("Import ▼")
+        import_btn.setText("Import")
         import_btn.setPopupMode(QToolButton.MenuButtonPopup)
         import_menu = QMenu(import_btn)
         import_menu.addAction("Import CSV", self.import_csv)
@@ -72,9 +52,8 @@ class MainWindow(QMainWindow):
         import_btn.setAutoRaise(True)
         toolbar.addWidget(import_btn)
 
-        # Export dropdown
         export_btn = QToolButton()
-        export_btn.setText("Export ▼")
+        export_btn.setText("Export")
         export_btn.setPopupMode(QToolButton.MenuButtonPopup)
         export_menu = QMenu(export_btn)
         export_menu.addAction("Export CSV", self.export_csv)
@@ -82,13 +61,10 @@ class MainWindow(QMainWindow):
         export_btn.setMenu(export_menu)
         export_btn.setAutoRaise(True)
         toolbar.addWidget(export_btn)
-
-        # Separator
         toolbar.addSeparator()
 
-        # -- SYNC RIOT (secondary) --
         sync_btn = QToolButton()
-        sync_btn.setText("🔄 Sync Riot")
+        sync_btn.setText("Sync Riot")
         sync_btn.setIcon(QIcon("assets/icons/ico/DataShieldP.ico"))
         sync_btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         sync_btn.setAutoRaise(True)
@@ -96,24 +72,19 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(sync_btn)
         self.actions = {"Sync Riot": sync_btn}
 
-        # Spacer to push Reset DB to far right
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         toolbar.addWidget(spacer)
 
-        # -- RESET DATABASE (tertiary) --
         reset_btn = QToolButton()
-        reset_btn.setText("⚠️ Reset DB")
+        reset_btn.setText("Reset DB")
         reset_btn.setToolTip("Delete entire database")
         reset_btn.setAutoRaise(True)
         reset_btn.clicked.connect(self.delete_database)
         toolbar.addWidget(reset_btn)
 
-        # Tree View (with password delegate on column 1)
         self.tree = AccountTreeView(self)
-        self.tree.setItemDelegateForColumn(1, PasswordDelegate(self))
         self.setCentralWidget(self.tree)
-
         self.statusBar().showMessage("Ready")
 
     def add_account(self):
@@ -127,9 +98,7 @@ class MainWindow(QMainWindow):
 
     def delete_database(self):
         resp = QMessageBox.question(
-            self,
-            "Delete Database",
-            "Delete entire database file?",
+            self, "Delete Database", "Delete entire database file?",
             QMessageBox.Yes | QMessageBox.No
         )
         if resp == QMessageBox.Yes:
@@ -141,7 +110,6 @@ class MainWindow(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(self, "Import CSV", "", "CSV Files (*.csv)")
         if not path:
             return
-
         all_rows = []
         for enc in ("utf-8-sig", "utf-8", "cp1250", "latin-1"):
             try:
@@ -152,17 +120,14 @@ class MainWindow(QMainWindow):
                 break
             except UnicodeDecodeError:
                 continue
-
         if not all_rows:
             QMessageBox.warning(self, "Import CSV", "No valid rows found.")
             return
-
         preview_rows = all_rows[:10]
         dlg = BulkImportPreviewDialog(preview_rows, self)
         if dlg.exec() == QDialog.Rejected:
             self.statusBar().showMessage("CSV import canceled", 3000)
             return
-
         count = 0
         for row in all_rows:
             try:
@@ -178,10 +143,11 @@ class MainWindow(QMainWindow):
                 acc = Account(
                     region=row.get("region", ""),
                     type=row.get("type", ""),
-                    login=row.get("login", ""),
+                    username=row.get("username", ""),
                     password=row.get("password", ""),
                     level=lvl,
                     mail=row.get("mail", ""),
+                    ranked=row.get("ranked", ""),
                     wins=wins,
                     losses=losses,
                     winrate=round(winrate, 1),
@@ -191,33 +157,30 @@ class MainWindow(QMainWindow):
                 count += 1
             except Exception:
                 continue
-
         self.load_data_async()
         self.statusBar().showMessage(f"Imported {count} rows", 4000)
 
     def export_csv(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Export CSV", "", "CSV Files (*.csv')")
+        path, _ = QFileDialog.getSaveFileName(self, "Export CSV", "", "CSV Files (*.csv)")
         if not path:
             return
-
         try:
             accounts = self.db.fetch_accounts()
             with open(path, "w", newline="", encoding="utf-8-sig") as f:
                 writer = csv.writer(f)
                 writer.writerow([
-                    "Login", "Password", "Level", "Email", "Ranked",
+                    "Username", "Password", "Level", "Email", "Ranked",
                     "Wins/Losses", "Winrate", "Riot ID"
                 ])
                 for region, types in accounts.items():
                     for ttype, accs in types.items():
                         for acc in accs:
-                            ranked_str = self.ranked_info.get(acc.id, "")
                             writer.writerow([
-                                acc.login,
+                                acc.username,
                                 acc.password,
                                 acc.level,
                                 acc.mail,
-                                ranked_str,
+                                acc.ranked,
                                 f"{acc.wins}/{acc.losses}",
                                 f"{acc.winrate}%",
                                 acc.riot_id
@@ -228,7 +191,7 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Export CSV failed", 4000)
 
     def import_json(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Import JSON", "", "JSON Files (*.json')")
+        path, _ = QFileDialog.getOpenFileName(self, "Import JSON", "", "JSON Files (*.json)")
         if not path:
             return
         try:
@@ -249,12 +212,18 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Import JSON failed", 4000)
 
     def export_json(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Export JSON", "", "JSON Files (*.json')")
+        path, _ = QFileDialog.getSaveFileName(self, "Export JSON", "", "JSON Files (*.json)")
         if not path:
             return
         try:
+            accounts = self.db.fetch_accounts()
+            flat = []
+            for types in accounts.values():
+                for accs in types.values():
+                    for acc in accs:
+                        flat.append(acc.__dict__)
             with open(path, "w", encoding="utf-8") as f:
-                json.dump([a.__dict__ for a in self.db.fetch_accounts()], f, indent=4, ensure_ascii=False)
+                json.dump(flat, f, indent=4, ensure_ascii=False)
             self.statusBar().showMessage("Exported JSON", 4000)
         except Exception as e:
             print(f"[Export JSON] Error: {e}")
@@ -273,6 +242,7 @@ class MainWindow(QMainWindow):
             self.db.update_field(acc_id, "level", lvl)
             self.db.update_field(acc_id, "wins", wins)
             self.db.update_field(acc_id, "losses", losses)
+            self.db.update_field(acc_id, "ranked", ranked)
             wr = round(wins / (wins + losses) * 100, 1) if (wins + losses) else 0.0
             self.db.update_field(acc_id, "winrate", wr)
             self.ranked_info[acc_id] = ranked
@@ -286,94 +256,106 @@ class MainWindow(QMainWindow):
         self.loader.start()
 
     def on_accounts_loaded(self, accounts):
+        from PySide6.QtWidgets import QHeaderView
         model = QStandardItemModel()
         model.setHorizontalHeaderLabels([
-            "Login", "Password", "Level", "Email", "Ranked",
+            "Username", "Password", "Level", "Email", "", "Rank",
             "Wins/Losses", "Winrate", "Riot ID"
         ])
         model.itemChanged.connect(self.on_item_changed)
-
+    
         for region, types in accounts.items():
             region_item = QStandardItem(region)
             region_item.setEditable(False)
             for ttype, accs in types.items():
+                accs = sorted(accs, key=lambda a: a.level, reverse=True)
                 type_item = QStandardItem(ttype)
                 type_item.setEditable(False)
                 for acc in accs:
-                    acc_items = [QStandardItem("") for _ in range(8)]
-
-                    # Login (editable)
-                    login_item = QStandardItem(acc.login)
-                    login_item.setTextAlignment(Qt.AlignCenter)
-                    login_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable)
-                    login_item.setData(acc.id, Qt.UserRole)
-                    acc_items[0] = login_item
-
-                    # Password (editable, password delegate applied)
+                    acc_items = [QStandardItem("") for _ in range(9)]
+    
+                    username_item = QStandardItem(acc.username)
+                    username_item.setTextAlignment(Qt.AlignCenter)
+                    username_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable)
+                    username_item.setData(acc.id, Qt.UserRole)
+                    acc_items[0] = username_item
+    
                     pwd_item = QStandardItem("***")
                     pwd_item.setData(acc.password, Qt.UserRole + 1)
                     pwd_item.setData(acc.id, Qt.UserRole)
                     pwd_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable)
                     pwd_item.setTextAlignment(Qt.AlignCenter)
                     acc_items[1] = pwd_item
-
-                    # Level (editable)
+    
                     level_item = QStandardItem(str(acc.level))
                     level_item.setTextAlignment(Qt.AlignCenter)
                     level_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable)
                     level_item.setData(acc.id, Qt.UserRole)
                     acc_items[2] = level_item
-
-                    # Email (editable)
+    
                     email_item = QStandardItem(acc.mail)
                     email_item.setTextAlignment(Qt.AlignCenter)
                     email_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable)
                     email_item.setData(acc.id, Qt.UserRole)
                     acc_items[3] = email_item
-
-                    # Ranked (editable)
-                    ranked_str = self.ranked_info.get(acc.id, "")
-                    ranked_item = QStandardItem(ranked_str)
-                    ranked_item.setTextAlignment(Qt.AlignCenter)
-                    ranked_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable)
-                    ranked_item.setData(acc.id, Qt.UserRole)
-                    acc_items[4] = ranked_item
-
-                    # Wins/Losses (editable)
-                    wl_text = f"{acc.wins}/{acc.losses}"
+    
+                    rank_icon_item = QStandardItem("")
+                    rank_icon_item.setEditable(False)
+                    acc_items[4] = rank_icon_item
+    
+                    ranked_str = acc.ranked or self.ranked_info.get(acc.id, "")
+                    rank_text_item = QStandardItem(ranked_str)
+                    rank_text_item.setTextAlignment(Qt.AlignCenter)
+                    rank_text_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable)
+                    rank_text_item.setData(acc.id, Qt.UserRole)
+                    acc_items[5] = rank_text_item
+    
+                    # --- Only show W/L and Winrate if level >= 30 ---
+                    if acc.level < 30:
+                        wl_text = ""
+                        wr_text = ""
+                    else:
+                        wl_text = f"{acc.wins}/{acc.losses}"
+                        wr_text = f"{acc.winrate}%"
+    
                     wl_item = QStandardItem(wl_text)
                     wl_item.setTextAlignment(Qt.AlignCenter)
                     wl_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable)
                     wl_item.setData(acc.id, Qt.UserRole)
-                    acc_items[5] = wl_item
-
-                    # Winrate (not editable)
-                    wr_text = f"{acc.winrate}%"
+                    acc_items[6] = wl_item
+    
                     wr_item = QStandardItem(wr_text)
                     wr_item.setTextAlignment(Qt.AlignCenter)
                     wr_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
                     wr_item.setData(acc.id, Qt.UserRole)
-                    acc_items[6] = wr_item
-
-                    # Riot ID (editable)
+                    acc_items[7] = wr_item
+    
                     riot_item = QStandardItem(acc.riot_id)
                     riot_item.setTextAlignment(Qt.AlignCenter)
                     riot_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable)
                     riot_item.setData(acc.id, Qt.UserRole)
-                    acc_items[7] = riot_item
-
+                    acc_items[8] = riot_item
+    
                     type_item.appendRow(acc_items)
-
+    
                 region_item.appendRow(type_item)
             model.appendRow(region_item)
-
+    
         self.tree.setModel(model)
         self.tree.expandAll()
-
-        # Center-align header titles
-        self.tree.header().setDefaultAlignment(Qt.AlignCenter)
-        self.tree.header().resizeSections(QHeaderView.ResizeToContents)
-
+        self.tree.setStyleSheet("QTreeView::item { height: 16px; }")
+    
+        self.tree.setItemDelegateForColumn(1, PasswordDelegate(self))
+        ranked_icon_path = os.path.abspath("assets/ranks")
+        self.tree.setItemDelegateForColumn(4, RankOnlyIconDelegate(ranked_icon_path, self.tree))
+    
+        header = self.tree.header()
+        header.setDefaultAlignment(Qt.AlignCenter)
+        for col in range(model.columnCount()):
+            header.setSectionResizeMode(col, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.Fixed)
+        header.resizeSection(4, 18)
+    
         self.statusBar().showMessage("Data loaded", 2000)
 
     def on_item_changed(self, item):
@@ -381,8 +363,8 @@ class MainWindow(QMainWindow):
         col = item.column()
         text = item.text()
 
-        if col == 0:  # Login
-            self.db.update_field(acc_id, "login", text)
+        if col == 0:  # Username
+            self.db.update_field(acc_id, "username", text)
         elif col == 1:  # Password (stored via UserRole+1)
             new_pwd = item.data(Qt.UserRole + 1)
             self.db.update_field(acc_id, "password", new_pwd)
@@ -394,9 +376,12 @@ class MainWindow(QMainWindow):
                 pass
         elif col == 3:  # Email
             self.db.update_field(acc_id, "mail", text)
-        elif col == 4:  # Ranked (in-memory only)
+        elif col == 4:  # Ranked icon (do nothing)
+            pass
+        elif col == 5:  # Rank text
+            self.db.update_field(acc_id, "ranked", text)
             self.ranked_info[acc_id] = text
-        elif col == 5:  # Wins/Losses
+        elif col == 6:  # Wins/Losses
             try:
                 wins_str, losses_str = text.split("/")
                 wins = int(wins_str)
@@ -407,10 +392,10 @@ class MainWindow(QMainWindow):
                 self.db.update_field(acc_id, "winrate", wr)
                 parent_item = item.parent()
                 if parent_item:
-                    wr_item = parent_item.child(item.row(), 6)
+                    wr_item = parent_item.child(item.row(), 7)
                     if wr_item:
                         wr_item.setText(f"{wr}%")
             except Exception:
                 pass
-        elif col == 7:  # Riot ID
+        elif col == 8:  # Riot ID
             self.db.update_field(acc_id, "riot_id", text)
