@@ -253,8 +253,15 @@ class MainWindow(QMainWindow):
         if not path:
             return
         try:
+            grouped = self.db.fetch_accounts()
+            accounts = []
+            for types in grouped.values():
+                for acc_list in types.values():
+                    accounts.extend(acc_list)
+
             with open(path, "w", encoding="utf-8") as f:
-                json.dump([a.__dict__ for a in self.db.fetch_accounts()], f, indent=4, ensure_ascii=False)
+                json.dump([acc.__dict__ for acc in accounts], f, indent=4, ensure_ascii=False)
+
             self.statusBar().showMessage("Exported JSON", 4000)
         except Exception as e:
             print(f"[Export JSON] Error: {e}")
