@@ -277,6 +277,7 @@ class MainWindow(QMainWindow):
                     username_item = QStandardItem(acc.username)
                     username_item.setTextAlignment(Qt.AlignCenter)
                     username_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable)
+                    username_item.setData(acc.username, Qt.UserRole + 1)
                     username_item.setData(acc.id, Qt.UserRole)
                     acc_items[0] = username_item
     
@@ -343,7 +344,7 @@ class MainWindow(QMainWindow):
     
         self.tree.setModel(model)
         self.tree.expandAll()
-        self.tree.setStyleSheet("QTreeView::item { height: 16px; }")
+        self.tree.setStyleSheet("QTreeView::item { height: 18px; }")
     
         self.tree.setItemDelegateForColumn(1, PasswordDelegate(self))
         ranked_icon_path = os.path.abspath("assets/ranks")
@@ -399,3 +400,91 @@ class MainWindow(QMainWindow):
                 pass
         elif col == 8:  # Riot ID
             self.db.update_field(acc_id, "riot_id", text)
+
+    def show_account_context_menu(self, index, global_pos):
+        from PySide6.QtWidgets import QMenu, QApplication
+        from PySide6.QtGui import QAction
+
+        model = self.tree.model()
+        item = model.itemFromIndex(index)
+        acc_id = item.data(Qt.UserRole)
+        parent = item.parent()
+        row = item.row()
+
+        menu = QMenu()
+
+        act_copy_user = QAction("Copy Username", self)
+        act_copy_pass = QAction("Copy Password", self)
+        act_toggle_user = QAction("Show/Hide Username", self)
+        act_toggle_pass = QAction("Show/Hide Password", self)
+        act_delete = QAction("Delete Account", self)
+
+        menu.addAction(act_copy_user)
+        menu.addAction(act_copy_pass)
+        menu.addSeparator()
+        menu.addAction(act_toggle_user)
+        menu.addAction(act_toggle_pass)
+        menu.addSeparator()
+        menu.addAction(act_delete)
+
+        def get_sibling(col):
+            return parent.child(row, col) if parent else None
+
+        def copy_username():
+            user_item = get_sibling(0)
+            if user_item:
+                QApplication.clipboard().setText(user_item.text())
+
+        def copy_password():
+            pwd_item = get_sibling(1)
+            if pwd_item:
+                pwd = pwd_item.data(Qt.UserRole + 1)
+                QApplication.clipboard().setText(pwd)
+
+        def toggle_username():
+            user_item = get_sibling(0)
+            if not user_item:
+                return
+            if user_item.text().startswith("***"):
+                real_username = user_item.data(Qt.UserRole + 1)
+                user_item.setText(real_username)
+            else:
+                user_item.setText("***")
+
+        def toggle_password():
+            pwd_item = get_sibling(1)
+            if not pwd_item:
+                return
+            if pwd_item.text().startswith("***"):
+                pwd = pwd_item.data(Qt.UserRole + 1)
+                pwd_item.setText(pwd)
+            else:
+                pwd_item.setText("***")
+
+        def delete_account():
+            if self.confirm_delete_account(acc_id):
+                self.db.cursor.execute("DELETE FROM accounts WHERE id = ?", (acc_id,))
+                self.db.conn.commit()
+                self.load_data_async()
+
+        act_copy_user.triggered.connect(copy_username)
+        act_copy_pass.triggered.connect(copy_password)
+        act_toggle_user.triggered.connect(toggle_username)
+        act_toggle_pass.triggered.connect(toggle_password)
+        act_delete.triggered.connect(delete_account)
+
+        menu.exec(global_pos)
+    
+    def get_account_by_id(self, acc_id):
+        accounts = self.db.fetch_accounts()
+        for region in accounts:
+            for ttype in accounts[region]:
+                for acc in accounts[region][ttype]:
+                    if acc.id == acc_id:
+                        return acc
+        return None
+    
+    def confirm_delete_account(self, acc_id):
+        from PySide6.QtWidgets import QMessageBox
+        ret = QMessageBox.question(self, "Delete Account", "Delete this account?", QMessageBox.Yes | QMessageBox.No)
+        return ret == QMessageBox.Yes

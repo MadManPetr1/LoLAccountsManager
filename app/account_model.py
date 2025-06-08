@@ -9,6 +9,14 @@ class AccountTreeView(QTreeView):
         self.setEditTriggers(QTreeView.DoubleClicked | QTreeView.SelectedClicked)
         self.setAlternatingRowColors(False)
         self.setUniformRowHeights(True)
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
+
+    def show_context_menu(self, pos):
+        index = self.indexAt(pos)
+        if not index.isValid() or not index.parent().isValid():
+            return
+        self.parent().show_account_context_menu(index, self.viewport().mapToGlobal(pos))
 
 class PasswordDelegate(QStyledItemDelegate):
     def createEditor(self, parent, option, index):
