@@ -265,12 +265,26 @@ class MainWindow(QMainWindow):
         model.itemChanged.connect(self.on_item_changed)
     
         for region, types in accounts.items():
+            # Region row: non-editable, all columns
+            region_items = [QStandardItem("") for _ in range(9)]
             region_item = QStandardItem(region)
             region_item.setEditable(False)
+            region_items[0] = region_item
+            for col in range(1, 9):
+                region_items[col].setEditable(False)
+            model.appendRow(region_items)
+    
             for ttype, accs in types.items():
-                accs = sorted(accs, key=lambda a: a.level, reverse=True)
+                # Type row: non-editable, all columns
+                type_items = [QStandardItem("") for _ in range(9)]
                 type_item = QStandardItem(ttype)
                 type_item.setEditable(False)
+                type_items[0] = type_item
+                for col in range(1, 9):
+                    type_items[col].setEditable(False)
+                region_item.appendRow(type_items)
+    
+                accs = sorted(accs, key=lambda a: a.level, reverse=True)
                 for acc in accs:
                     acc_items = [QStandardItem("") for _ in range(9)]
     
@@ -307,11 +321,14 @@ class MainWindow(QMainWindow):
                     ranked_str = acc.ranked or self.ranked_info.get(acc.id, "")
                     rank_text_item = QStandardItem(ranked_str)
                     rank_text_item.setTextAlignment(Qt.AlignCenter)
-                    rank_text_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable)
+                    # Editable only if level >= 30
+                    flags = Qt.ItemIsSelectable | Qt.ItemIsEnabled
+                    if acc.level >= 30:
+                        flags |= Qt.ItemIsEditable
+                    rank_text_item.setFlags(flags)
                     rank_text_item.setData(acc.id, Qt.UserRole)
                     acc_items[5] = rank_text_item
     
-                    # --- Only show W/L and Winrate if level >= 30 ---
                     if acc.level < 30:
                         wl_text = ""
                         wr_text = ""
@@ -321,7 +338,10 @@ class MainWindow(QMainWindow):
     
                     wl_item = QStandardItem(wl_text)
                     wl_item.setTextAlignment(Qt.AlignCenter)
-                    wl_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable)
+                    flags = Qt.ItemIsSelectable | Qt.ItemIsEnabled
+                    if acc.level >= 30:
+                        flags |= Qt.ItemIsEditable
+                    wl_item.setFlags(flags)
                     wl_item.setData(acc.id, Qt.UserRole)
                     acc_items[6] = wl_item
     
@@ -338,9 +358,6 @@ class MainWindow(QMainWindow):
                     acc_items[8] = riot_item
     
                     type_item.appendRow(acc_items)
-    
-                region_item.appendRow(type_item)
-            model.appendRow(region_item)
     
         self.tree.setModel(model)
         self.tree.expandAll()
@@ -363,7 +380,7 @@ class MainWindow(QMainWindow):
         acc_id = item.data(Qt.UserRole)
         col = item.column()
         text = item.text()
-
+    
         if col == 0:  # Username
             self.db.update_field(acc_id, "username", text)
         elif col == 1:  # Password (stored via UserRole+1)
@@ -373,6 +390,23 @@ class MainWindow(QMainWindow):
             try:
                 lvl = int(text)
                 self.db.update_field(acc_id, "level", lvl)
+                # Update editability of rank and wins/losses columns
+                parent_item = item.parent()
+                row = item.row()
+                # Rank text (col 5)
+                rank_item = parent_item.child(row, 5) if parent_item else None
+                if rank_item:
+                    flags = Qt.ItemIsSelectable | Qt.ItemIsEnabled
+                    if lvl >= 30:
+                        flags |= Qt.ItemIsEditable
+                    rank_item.setFlags(flags)
+                # Wins/Losses (col 6)
+                wl_item = parent_item.child(row, 6) if parent_item else None
+                if wl_item:
+                    flags = Qt.ItemIsSelectable | Qt.ItemIsEnabled
+                    if lvl >= 30:
+                        flags |= Qt.ItemIsEditable
+                    wl_item.setFlags(flags)
             except ValueError:
                 pass
         elif col == 3:  # Email

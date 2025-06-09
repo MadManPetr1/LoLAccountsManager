@@ -14,7 +14,11 @@ class AccountTreeView(QTreeView):
 
     def show_context_menu(self, pos):
         index = self.indexAt(pos)
-        if not index.isValid() or not index.parent().isValid():
+        if not index.isValid():
+            return
+        item = self.model().itemFromIndex(index)
+
+        if not item.parent() or not item.parent().parent():
             return
         self.parent().show_account_context_menu(index, self.viewport().mapToGlobal(pos))
 
