@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QTreeView, QStyledItemDelegate, QLineEdit
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QIcon
-from PySide6.QtCore import Qt, QRect
+from PySide6.QtCore import Qt, QRect, QSize
 import os
 
 class AccountTreeView(QTreeView):
@@ -37,6 +37,11 @@ class PasswordDelegate(QStyledItemDelegate):
         model.setData(index, "***")
         model.setData(index, text, Qt.UserRole + 1)
 
+from PySide6.QtWidgets import QStyledItemDelegate
+from PySide6.QtGui import QIcon
+from PySide6.QtCore import QRect, QSize, Qt
+import os
+
 class RankOnlyIconDelegate(QStyledItemDelegate):
     def __init__(self, icon_folder, parent=None):
         super().__init__(parent)
@@ -53,12 +58,14 @@ class RankOnlyIconDelegate(QStyledItemDelegate):
             "GM": "grandmaster.png",
             "C": "challenger.png"
         }
-        self.icon_size = 16
+        self.icon_width = 24
+        self.icon_height = 18
 
     def paint(self, painter, option, index):
-        if not index.parent().isValid():
+        parent = index.parent()
+        # Only paint for account rows (region and type as parents)
+        if not parent.isValid() or not parent.parent().isValid():
             return
-
         value = index.sibling(index.row(), index.column() + 1).data(Qt.DisplayRole)
         rank_key = None
         if value:
@@ -71,14 +78,11 @@ class RankOnlyIconDelegate(QStyledItemDelegate):
         icon_path = os.path.join(self.icon_folder, icon_name)
         icon = QIcon(icon_path)
         icon_rect = QRect(
-            option.rect.left() + (option.rect.width() - self.icon_size) // 2,
-            option.rect.top() + (option.rect.height() - self.icon_size) // 2,
-            self.icon_size,
-            self.icon_size
+            option.rect.left() + (self.icon_width - self.icon_height) // 2,
+            option.rect.top() + (option.rect.height() - self.icon_height) // 2,
+            self.icon_width, self.icon_height
         )
         icon.paint(painter, icon_rect, Qt.AlignCenter)
 
     def sizeHint(self, option, index):
-        sz = super().sizeHint(option, index)
-        sz.setWidth(self.icon_size + 2)
-        return sz
+        return QSize(self.icon_width, self.icon_height)

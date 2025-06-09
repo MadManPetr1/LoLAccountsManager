@@ -372,7 +372,7 @@ class MainWindow(QMainWindow):
         for col in range(model.columnCount()):
             header.setSectionResizeMode(col, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.Fixed)
-        header.resizeSection(4, 18)
+        header.resizeSection(4, 24)
     
         self.statusBar().showMessage("Data loaded", 2000)
 
@@ -380,9 +380,10 @@ class MainWindow(QMainWindow):
         acc_id = item.data(Qt.UserRole)
         col = item.column()
         text = item.text()
-    
+
         if col == 0:  # Username
-            self.db.update_field(acc_id, "username", text)
+            if text != "***":
+                self.db.update_field(acc_id, "username", text)
         elif col == 1:  # Password (stored via UserRole+1)
             new_pwd = item.data(Qt.UserRole + 1)
             self.db.update_field(acc_id, "password", new_pwd)
