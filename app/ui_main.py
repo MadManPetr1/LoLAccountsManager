@@ -32,6 +32,24 @@ class MainWindow(QMainWindow):
         toolbar = QToolBar("Main Toolbar", self)
         toolbar.setMovable(False)
         self.addToolBar(toolbar)
+        self.show_usernames = True
+        self.show_passwords = False
+
+        toggle_user_btn = QToolButton()
+        toggle_user_btn.setText("Hide Usernames")
+        toggle_user_btn.setCheckable(True)
+        toggle_user_btn.setChecked(False)
+        toggle_user_btn.clicked.connect(self.toggle_show_usernames)
+        toolbar.addWidget(toggle_user_btn)
+        self.toggle_user_btn = toggle_user_btn
+
+        toggle_pass_btn = QToolButton()
+        toggle_pass_btn.setText("Show Passwords")
+        toggle_pass_btn.setCheckable(True)
+        toggle_pass_btn.setChecked(False)
+        toggle_pass_btn.clicked.connect(self.toggle_show_passwords)
+        toolbar.addWidget(toggle_pass_btn)
+        self.toggle_pass_btn = toggle_pass_btn
 
         add_btn = QToolButton()
         add_btn.setText("Add Account")
@@ -450,15 +468,11 @@ class MainWindow(QMainWindow):
 
         act_copy_user = QAction("Copy Username", self)
         act_copy_pass = QAction("Copy Password", self)
-        act_toggle_user = QAction("Show/Hide Username", self)
-        act_toggle_pass = QAction("Show/Hide Password", self)
         act_delete = QAction("Delete Account", self)
 
         menu.addAction(act_copy_user)
         menu.addAction(act_copy_pass)
         menu.addSeparator()
-        menu.addAction(act_toggle_user)
-        menu.addAction(act_toggle_pass)
         menu.addSeparator()
         menu.addAction(act_delete)
 
@@ -504,8 +518,6 @@ class MainWindow(QMainWindow):
 
         act_copy_user.triggered.connect(copy_username)
         act_copy_pass.triggered.connect(copy_password)
-        act_toggle_user.triggered.connect(toggle_username)
-        act_toggle_pass.triggered.connect(toggle_password)
         act_delete.triggered.connect(delete_account)
 
         menu.exec(global_pos)
@@ -523,3 +535,35 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QMessageBox
         ret = QMessageBox.question(self, "Delete Account", "Delete this account?", QMessageBox.Yes | QMessageBox.No)
         return ret == QMessageBox.Yes
+
+    def toggle_show_usernames(self):
+        self.show_usernames = not self.show_usernames
+        self.toggle_user_btn.setText("Show Usernames" if not self.show_usernames else "Hide Usernames")
+        model = self.tree.model()
+        for region in range(model.rowCount()):
+            region_item = model.item(region, 0)
+            for t in range(region_item.rowCount()):
+                type_item = region_item.child(t, 0)
+                for row in range(type_item.rowCount()):
+                    user_item = type_item.child(row, 0)
+                    real_username = user_item.data(Qt.UserRole + 1)
+                    if self.show_usernames:
+                        user_item.setText(real_username)
+                    else:
+                        user_item.setText("***")
+
+    def toggle_show_passwords(self):
+        self.show_passwords = not self.show_passwords
+        self.toggle_pass_btn.setText("Hide Passwords" if self.show_passwords else "Show Passwords")
+        model = self.tree.model()
+        for region in range(model.rowCount()):
+            region_item = model.item(region, 0)
+            for t in range(region_item.rowCount()):
+                type_item = region_item.child(t, 0)
+                for row in range(type_item.rowCount()):
+                    pwd_item = type_item.child(row, 1)
+                    real_pwd = pwd_item.data(Qt.UserRole + 1)
+                    if self.show_passwords:
+                        pwd_item.setText(real_pwd)
+                    else:
+                        pwd_item.setText("***")
